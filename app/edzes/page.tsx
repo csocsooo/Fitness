@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PROGRAM, getWeek, type SetSpec, type WorkoutBlock } from "@/lib/program";
 import { EXERCISES, getExercise } from "@/lib/exercises";
+import { getAnimId } from "@/lib/animations";
+import ExerciseAnimation from "@/components/ExerciseAnimation";
 import { computeCurrentWeek, todayISO, useAppState, type SetLog, type WorkoutLog } from "@/lib/store";
 
 function fmtTime(sec: number) {
@@ -126,6 +128,7 @@ function ItemRow({
 
       {expanded && (
         <div className="mt-3 space-y-3">
+          <ExerciseAnimation dbId={getAnimId(ex.id)} size="md" />
           <div className="text-sm text-white/85">{ex.desc}</div>
           <ul className="text-sm list-disc pl-5 text-white/80 space-y-0.5">
             {ex.cues.map((c, i) => <li key={i}>{c}</li>)}

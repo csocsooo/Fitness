@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { EXERCISES, type Muscle } from "@/lib/exercises";
+import { getAnimId } from "@/lib/animations";
+import ExerciseAnimation from "@/components/ExerciseAnimation";
 
 const MUSCLES: { id: Muscle; label: string }[] = [
   { id: "mell", label: "Mell" },
@@ -68,6 +70,9 @@ export default function Exercises() {
                   <span key={m} className="tag">{m}</span>
                 ))}
               </div>
+            </div>
+            <div className="mt-3">
+              <ExerciseAnimation dbId={getAnimId(e.id)} size="md" />
             </div>
             <p className="text-sm text-white/85 mt-2">{e.desc}</p>
             <ul className="mt-2 list-disc pl-5 text-sm text-white/75 space-y-0.5">

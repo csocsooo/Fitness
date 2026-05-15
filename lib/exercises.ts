@@ -12,6 +12,8 @@ export type Exercise = {
   regression?: string;   // könnyítés
   progression?: string;  // nehezítés
   unit: "ismétlés" | "másodperc" | "perc";
+  // free-exercise-db (yuhonas) ID a vizuális 2-frame animációhoz
+  animId?: string;
 };
 
 export const EXERCISES: Exercise[] = [
