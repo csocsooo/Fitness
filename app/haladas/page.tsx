@@ -5,6 +5,7 @@ import { useAppState, computeCurrentWeek } from "@/lib/store";
 import { PROGRAM, targetWeightForWeek } from "@/lib/program";
 import { EXERCISES, getExercise } from "@/lib/exercises";
 import WeightChart from "@/components/WeightChart";
+import Calendar from "@/components/Calendar";
 
 export default function Haladas() {
   const { state, ready } = useAppState();
@@ -93,6 +94,12 @@ export default function Haladas() {
           )}
         </div>
       </section>
+
+      <Calendar
+        workouts={state.workouts}
+        startDate={state.profile.startDate}
+        programDays={26 * 7}
+      />
 
       <section className="card">
         <h2 className="h2 mb-3">Hetek áttekintés</h2>

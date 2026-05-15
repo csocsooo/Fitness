@@ -88,14 +88,14 @@ function DurationTimer({ seconds, onDone }: { seconds: number; onDone: (elapsed:
 
 function ItemRow({
   item,
-  index,
-  blockTitle,
+  blockIndex,
+  itemIndex,
   log,
   onLog,
 }: {
   item: SetSpec;
-  index: number;
-  blockTitle: string;
+  blockIndex: number;
+  itemIndex: number;
   log: SetLog[];
   onLog: (set: SetLog) => void;
 }) {
@@ -104,7 +104,8 @@ function ItemRow({
   const [restingFor, setRestingFor] = useState<number | null>(null);
 
   if (!ex) return null;
-  const setsDone = log.filter((s) => s.exerciseId === item.exerciseId && s.done).length;
+  const slotPrefix = `${blockIndex}-${itemIndex}-`;
+  const setsDone = log.filter((s) => s.slotId?.startsWith(slotPrefix) && s.done).length;
   const allDone = setsDone >= item.sets;
 
   return (
@@ -150,7 +151,8 @@ function ItemRow({
 
           <div className="grid gap-2">
             {Array.from({ length: item.sets }).map((_, sIdx) => {
-              const existing = log.find((l) => l.exerciseId === item.exerciseId && l.setIndex === sIdx);
+              const slotId = `${blockIndex}-${itemIndex}-${sIdx}`;
+              const existing = log.find((l) => l.slotId === slotId);
               return (
                 <SetRow
                   key={sIdx}
@@ -162,6 +164,7 @@ function ItemRow({
                     onLog({
                       exerciseId: item.exerciseId,
                       setIndex: sIdx,
+                      slotId,
                       reps: payload.reps,
                       durationSec: payload.durationSec,
                       rpe: payload.rpe,
@@ -278,9 +281,7 @@ function WorkoutInner() {
 
   function upsertSet(newSet: SetLog) {
     setSets((prev) => {
-      const others = prev.filter(
-        (s) => !(s.exerciseId === newSet.exerciseId && s.setIndex === newSet.setIndex)
-      );
+      const others = prev.filter((s) => s.slotId !== newSet.slotId);
       const next = [...others, newSet];
       saveWorkout(next, feeling === "" ? undefined : (feeling as 1|2|3|4|5), notes);
       return next;
@@ -301,9 +302,8 @@ function WorkoutInner() {
     update((s) => {
       const others = s.workouts.filter((w) => w.id !== logKey);
       const completed = { ...s.completed };
-      // Csak akkor jelöljük késznek, ha minden szett megvan
       const totalSets = session.blocks.reduce((acc, b) => acc + b.items.reduce((a, i) => a + i.sets, 0), 0);
-      const doneSets = setsX.filter((x) => x.done).length;
+      const doneSets = setsX.filter((x) => x.done && x.slotId).length;
       if (doneSets >= totalSets) {
         completed[`w${wIdx}-${session.id}`] = todayISO();
         completed[`w${wIdx}`] = todayISO();
@@ -312,8 +312,24 @@ function WorkoutInner() {
     });
   }
 
+  function resetSession() {
+    if (!confirm("Biztosan törlöd a mai edzés szett-jelölőit? A bevitt értékek elvesznek.")) return;
+    setSets([]);
+    setFeeling("");
+    setNotes("");
+    update((s) => ({
+      ...s,
+      workouts: s.workouts.filter((w) => w.id !== logKey),
+      completed: Object.fromEntries(
+        Object.entries(s.completed).filter(
+          ([k]) => k !== `w${wIdx}-${session.id}` && k !== `w${wIdx}`
+        )
+      ),
+    }));
+  }
+
   const totalSets = session.blocks.reduce((acc, b) => acc + b.items.reduce((a, i) => a + i.sets, 0), 0);
-  const doneSets = sets.filter((s) => s.done).length;
+  const doneSets = sets.filter((s) => s.done && s.slotId).length;
   const pct = totalSets ? Math.round((doneSets / totalSets) * 100) : 0;
 
   return (
@@ -350,7 +366,7 @@ function WorkoutInner() {
       </div>
 
       {session.blocks.map((block, bi) => (
-        <BlockView key={bi} block={block} sets={sets} onLog={upsertSet} />
+        <BlockView key={bi} block={block} blockIndex={bi} sets={sets} onLog={upsertSet} />
       ))}
 
       <section className="card space-y-3">
@@ -384,7 +400,7 @@ function WorkoutInner() {
         </div>
       </section>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button
           className="btn-primary"
           onClick={() => {
@@ -395,6 +411,9 @@ function WorkoutInner() {
           Edzés mentése
         </button>
         <Link href="/" className="btn-ghost">Vissza</Link>
+        <button className="btn-ghost text-danger ml-auto" onClick={resetSession}>
+          ↺ Edzés újrakezdése
+        </button>
       </div>
     </div>
   );
@@ -402,10 +421,12 @@ function WorkoutInner() {
 
 function BlockView({
   block,
+  blockIndex,
   sets,
   onLog,
 }: {
   block: WorkoutBlock;
+  blockIndex: number;
   sets: SetLog[];
   onLog: (s: SetLog) => void;
 }) {
@@ -414,7 +435,7 @@ function BlockView({
       <h2 className="h2 mt-2">{block.title}</h2>
       <div className="grid gap-2">
         {block.items.map((it, i) => (
-          <ItemRow key={i} item={it} index={i} blockTitle={block.title} log={sets} onLog={onLog} />
+          <ItemRow key={i} item={it} blockIndex={blockIndex} itemIndex={i} log={sets} onLog={onLog} />
         ))}
       </div>
     </section>

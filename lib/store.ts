@@ -22,6 +22,9 @@ export type WeightEntry = {
 export type SetLog = {
   exerciseId: string;
   setIndex: number;
+  // Egyedi slot-azonosító: "blockIdx-itemIdx-setIdx" — így ugyanaz a gyakorlat
+  // különböző blokkokban (pl. bemelegítés és levezetés) független szettnek számít.
+  slotId?: string;
   reps?: number;
   durationSec?: number;
   // RPE 1-10: mennyire volt nehéz
