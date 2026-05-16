@@ -304,9 +304,15 @@ function WorkoutInner() {
       const completed = { ...s.completed };
       const totalSets = session.blocks.reduce((acc, b) => acc + b.items.reduce((a, i) => a + i.sets, 0), 0);
       const doneSets = setsX.filter((x) => x.done && x.slotId).length;
-      if (doneSets >= totalSets) {
-        completed[`w${wIdx}-${session.id}`] = todayISO();
-        completed[`w${wIdx}`] = todayISO();
+      // Kész jelölés ha: minden szett pipálva, VAGY feeling kitöltve és van legalább 1 szett,
+      // VAGY az edzés legalább 12 percig tartott.
+      const isComplete =
+        (doneSets >= totalSets) ||
+        (feelingX !== undefined && doneSets >= 1) ||
+        (log.durationMin !== undefined && log.durationMin >= 12 && doneSets >= 1);
+      if (isComplete) {
+        completed[`w${wIdx}-${session.id}`] = log.date;
+        completed[`w${wIdx}`] = log.date;
       }
       return { ...s, workouts: [...others, log], completed };
     });
@@ -410,9 +416,26 @@ function WorkoutInner() {
         >
           Edzés mentése
         </button>
+        <button
+          className="btn-secondary !bg-accent2/20 !border-accent2/50 text-accent2 hover:!bg-accent2/30"
+          onClick={() => {
+            // Manuális: jelöld késznek függetlenül a százaléktól
+            update((s) => {
+              const completed = { ...s.completed };
+              completed[`w${wIdx}-${session.id}`] = todayISO();
+              completed[`w${wIdx}`] = todayISO();
+              return { ...s, completed };
+            });
+            saveWorkout(sets, feeling === "" ? undefined : (feeling as any), notes);
+            router.push("/");
+          }}
+          title="Megjelöld késznek függetlenül a százaléktól"
+        >
+          ✅ Befejezve
+        </button>
         <Link href="/" className="btn-ghost">Vissza</Link>
         <button className="btn-ghost text-danger ml-auto" onClick={resetSession}>
-          ↺ Edzés újrakezdése
+          ↺ Újrakezdés
         </button>
       </div>
     </div>

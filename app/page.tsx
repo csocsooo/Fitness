@@ -26,6 +26,27 @@ export default function Home() {
     if (latestWeight) setWeightInput(String(latestWeight.kg));
   }, [latestWeight?.kg]);
 
+  // Egyszeri migráció: a régi (még completed-bejegyzés nélkül mentett) edzéseket
+  // utólag késznek jelöljük, ha van feeling vagy >=12 perc volt.
+  useEffect(() => {
+    if (!ready) return;
+    let changed = false;
+    const completed = { ...state.completed };
+    for (const w of state.workouts) {
+      const key = `w${w.weekIndex}-${w.sessionId}`;
+      if (completed[key]) continue;
+      const hasDone = w.sets.some((s) => s.done);
+      const isComplete = hasDone && (!!w.feeling || (w.durationMin ?? 0) >= 12);
+      if (isComplete) {
+        completed[key] = w.date;
+        completed[`w${w.weekIndex}`] = w.date;
+        changed = true;
+      }
+    }
+    if (changed) update((s) => ({ ...s, completed }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
   function saveWeight() {
     const kg = parseFloat(weightInput.replace(",", "."));
     if (Number.isNaN(kg) || kg < 30 || kg > 250) return;
@@ -111,10 +132,21 @@ export default function Home() {
       {/* Mai / heti edzések */}
       <section>
         <h2 className="h2 mb-3">Ez a heti edzések</h2>
+        <p className="text-xs text-muted mb-3">
+          Tipp: a jobb felső <span className="text-accent">✓</span> gombbal manuálisan is megjelölheted készként.
+        </p>
         <div className="grid sm:grid-cols-2 gap-3">
           {week.sessions.map((s) => {
-            const doneDate = completedThisWeek && (state.completed as any)[`w${week.index}-${s.id}`];
-            return <SessionCard key={s.id} weekIndex={week.index} session={s} done={!!doneDate} />;
+            const doneDate = (state.completed as any)[`w${week.index}-${s.id}`];
+            return (
+              <SessionCard
+                key={s.id}
+                weekIndex={week.index}
+                session={s}
+                done={!!doneDate}
+                doneDate={doneDate || undefined}
+              />
+            );
           })}
         </div>
       </section>
