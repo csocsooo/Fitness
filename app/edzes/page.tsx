@@ -371,6 +371,45 @@ function WorkoutInner() {
         ))}
       </div>
 
+      {(() => {
+        const doneKey = `w${wIdx}-${session.id}`;
+        const doneDate = (state.completed as any)[doneKey];
+        if (doneDate && doneDate !== todayISO()) {
+          return (
+            <div className="card !bg-accent2/10 !border-accent2/40">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">✅</div>
+                <div className="flex-1">
+                  <div className="font-semibold text-accent2">Ezt az edzést már elvégezted ({doneDate})</div>
+                  <div className="text-sm text-muted mt-1">
+                    Nyugodtan átléphetsz egy másik napra, vagy elvégezheted újra. Az alábbi szettek mai kísérletet rögzítenek külön.
+                  </div>
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    <Link href="/" className="btn-secondary text-sm">← Vissza a heti tervhez</Link>
+                    <button
+                      onClick={() => {
+                        update((s) => {
+                          const completed = { ...s.completed };
+                          delete completed[doneKey];
+                          // hét-szintű flag: csak ha más session sincs kész a héten
+                          const anyLeft = Object.keys(completed).some((k) => k.startsWith(`w${wIdx}-`));
+                          if (!anyLeft) delete completed[`w${wIdx}`];
+                          return { ...s, completed };
+                        });
+                      }}
+                      className="btn-ghost text-sm"
+                    >
+                      ↺ Visszavonás
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       {session.blocks.map((block, bi) => (
         <BlockView key={bi} block={block} blockIndex={bi} sets={sets} onLog={upsertSet} />
       ))}

@@ -67,6 +67,8 @@ export type AppState = {
   completed: Record<string, string>;
   // App állapot
   currentWeek: number;
+  // Egyszer lefutó migrációk azonosítói
+  migrations?: string[];
 };
 
 const DEFAULT_STATE: AppState = {
@@ -97,10 +99,53 @@ function readState(): AppState {
     const raw = localStorage.getItem(KEY);
     if (!raw) return DEFAULT_STATE;
     const parsed = JSON.parse(raw) as Partial<AppState>;
-    return { ...DEFAULT_STATE, ...parsed, profile: { ...DEFAULT_STATE.profile, ...parsed.profile }, settings: { ...DEFAULT_STATE.settings, ...parsed.settings } };
+    const merged: AppState = {
+      ...DEFAULT_STATE,
+      ...parsed,
+      profile: { ...DEFAULT_STATE.profile, ...parsed.profile },
+      settings: { ...DEFAULT_STATE.settings, ...parsed.settings },
+    };
+    const migrated = runMigrations(merged);
+    if (migrated !== merged) {
+      // Mentjük is a változásokat, hogy ne fusson le újra
+      localStorage.setItem(KEY, JSON.stringify(migrated));
+    }
+    return migrated;
   } catch {
     return DEFAULT_STATE;
   }
+}
+
+// Egyszer-futó migrációk. A `migrations` tömb tartalmazza a már lefutott ID-ket.
+function runMigrations(s: AppState): AppState {
+  const done = new Set(s.migrations ?? []);
+  let next = s;
+
+  // m1: a régi (slotId nélküli) edzéseket utólag késznek jelöli,
+  // ha van feeling vagy >=12 perc. Azóta automatikusan kezeljük, de a régi
+  // felhasználói adatokra szükség van rá.
+  if (!done.has("m1-complete-by-feeling")) {
+    const completed = { ...next.completed };
+    let changed = false;
+    for (const w of next.workouts) {
+      const key = `w${w.weekIndex}-${w.sessionId}`;
+      if (completed[key]) continue;
+      const hasDone = w.sets.some((x) => x.done);
+      const isComplete = hasDone && (!!w.feeling || (w.durationMin ?? 0) >= 12);
+      if (isComplete) {
+        completed[key] = w.date;
+        completed[`w${w.weekIndex}`] = w.date;
+        changed = true;
+      }
+    }
+    if (changed) next = { ...next, completed };
+    done.add("m1-complete-by-feeling");
+  }
+
+  if (done.size !== (s.migrations?.length ?? 0)) {
+    next = { ...next, migrations: Array.from(done) };
+  }
+  return next;
 }
 
 function writeState(state: AppState) {

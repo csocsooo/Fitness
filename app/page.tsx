@@ -26,27 +26,6 @@ export default function Home() {
     if (latestWeight) setWeightInput(String(latestWeight.kg));
   }, [latestWeight?.kg]);
 
-  // Egyszeri migráció: a régi (még completed-bejegyzés nélkül mentett) edzéseket
-  // utólag késznek jelöljük, ha van feeling vagy >=12 perc volt.
-  useEffect(() => {
-    if (!ready) return;
-    let changed = false;
-    const completed = { ...state.completed };
-    for (const w of state.workouts) {
-      const key = `w${w.weekIndex}-${w.sessionId}`;
-      if (completed[key]) continue;
-      const hasDone = w.sets.some((s) => s.done);
-      const isComplete = hasDone && (!!w.feeling || (w.durationMin ?? 0) >= 12);
-      if (isComplete) {
-        completed[key] = w.date;
-        completed[`w${w.weekIndex}`] = w.date;
-        changed = true;
-      }
-    }
-    if (changed) update((s) => ({ ...s, completed }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
-
   function saveWeight() {
     const kg = parseFloat(weightInput.replace(",", "."));
     if (Number.isNaN(kg) || kg < 30 || kg > 250) return;
