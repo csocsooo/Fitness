@@ -304,10 +304,10 @@ function WorkoutInner() {
       const completed = { ...s.completed };
       const totalSets = session.blocks.reduce((acc, b) => acc + b.items.reduce((a, i) => a + i.sets, 0), 0);
       const doneSets = setsX.filter((x) => x.done && x.slotId).length;
-      // Kész jelölés ha: minden szett pipálva, VAGY feeling kitöltve és van legalább 1 szett,
+      // Kész jelölés ha: 90% feletti szett megvan, VAGY feeling kitöltve és van legalább 1 szett,
       // VAGY az edzés legalább 12 percig tartott.
       const isComplete =
-        (doneSets >= totalSets) ||
+        (totalSets > 0 && doneSets / totalSets >= 0.9) ||
         (feelingX !== undefined && doneSets >= 1) ||
         (log.durationMin !== undefined && log.durationMin >= 12 && doneSets >= 1);
       if (isComplete) {
@@ -492,9 +492,42 @@ function BlockView({
   sets: SetLog[];
   onLog: (s: SetLog) => void;
 }) {
+  const totalInBlock = block.items.reduce((a, i) => a + i.sets, 0);
+  const doneInBlock = sets.filter((s) =>
+    s.slotId?.startsWith(`${blockIndex}-`) && s.done
+  ).length;
+  const allBlockDone = doneInBlock >= totalInBlock;
+
+  function checkAll() {
+    block.items.forEach((it, ii) => {
+      for (let si = 0; si < it.sets; si++) {
+        const slotId = `${blockIndex}-${ii}-${si}`;
+        if (sets.some((s) => s.slotId === slotId && s.done)) continue;
+        onLog({
+          exerciseId: it.exerciseId,
+          setIndex: si,
+          slotId,
+          reps: it.reps,
+          durationSec: it.durationSec,
+          done: true,
+        });
+      }
+    });
+  }
+
   return (
     <section className="space-y-2">
-      <h2 className="h2 mt-2">{block.title}</h2>
+      <div className="flex items-center justify-between gap-2 mt-2">
+        <h2 className="h2">{block.title}</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted">{doneInBlock}/{totalInBlock}</span>
+          {!allBlockDone && (
+            <button onClick={checkAll} className="btn-secondary !py-1 !px-2 text-xs">
+              ✓ Mind kész
+            </button>
+          )}
+        </div>
+      </div>
       <div className="grid gap-2">
         {block.items.map((it, i) => (
           <ItemRow key={i} item={it} blockIndex={blockIndex} itemIndex={i} log={sets} onLog={onLog} />

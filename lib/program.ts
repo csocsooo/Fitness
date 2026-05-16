@@ -60,7 +60,6 @@ function levezetes(): WorkoutBlock {
     items: [
       { exerciseId: "hip-flexor-stretch", sets: 1, durationSec: 60, restSec: 10, note: "30 mp oldalanként" },
       { exerciseId: "thoracic-rotation", sets: 1, reps: 10, restSec: 10 },
-      { exerciseId: "cat-cow", sets: 1, reps: 10, restSec: 10 },
     ],
   };
 }

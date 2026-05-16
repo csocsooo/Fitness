@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppState, exportState, importState, resetState } from "@/lib/store";
+import {
+  generateSyncCode,
+  getSyncCode,
+  pullState,
+  pushState,
+  setSyncCode,
+  useSyncCode,
+} from "@/lib/sync";
 
 export default function Beallitasok() {
   const { state, ready, update } = useAppState();
@@ -85,6 +93,8 @@ export default function Beallitasok() {
         </div>
       </section>
 
+      <CloudSyncSection state={state} update={update} />
+
       <section className="card space-y-3">
         <h2 className="h2">Adatok mentése / visszaállítása</h2>
         <p className="text-sm text-muted">
@@ -153,5 +163,139 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="label">{label}</span>
       {children}
     </label>
+  );
+}
+
+function CloudSyncSection({ state, update }: { state: any; update: any }) {
+  const code = useSyncCode();
+  const [input, setInput] = useState<string>("");
+  const [msg, setMsg] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setInput(code ?? "");
+  }, [code]);
+
+  async function activate() {
+    const c = input.trim();
+    if (!/^[a-zA-Z0-9_-]{6,32}$/.test(c)) {
+      setMsg("A sync kód 6–32 karakter, csak betűk/számok/-/_.");
+      return;
+    }
+    setBusy(true);
+    setMsg("");
+    setSyncCode(c);
+    // Megpróbálunk pull-olni — ha üres, push-olunk
+    const r = await pullState(c);
+    if (r.ok && r.data) {
+      if (confirm("A felhőben már van adat ehhez a kódhoz. Felülírja a lokális adatokat?")) {
+        update(() => (r.data as any).state);
+        setMsg("✅ Felhőből letöltve.");
+      } else {
+        // Lokál győz: pusholjuk
+        await pushState(c, state);
+        setMsg("✅ Lokál állapot feltöltve.");
+      }
+    } else {
+      const p = await pushState(c, state);
+      setMsg(p.ok ? "✅ Sync aktiválva, állapot feltöltve." : "Hiba: " + (p.error || ""));
+    }
+    setBusy(false);
+  }
+
+  function generate() {
+    const c = generateSyncCode();
+    setInput(c);
+  }
+
+  function disconnect() {
+    if (!confirm("Lecsatolod a felhőt? Az adatok lokálisan megmaradnak, de nem szinkronizálódnak.")) return;
+    setSyncCode(null);
+    setMsg("Sync kikapcsolva.");
+  }
+
+  return (
+    <section className="card space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="h2">☁️ Cloud sync</h2>
+        {code && <span className="tag !bg-accent2/20 !text-accent2 !border-accent2/40">aktív</span>}
+      </div>
+      <p className="text-sm text-muted">
+        Adj meg egy <b>személyes sync kódot</b> (6–32 karakter). Másik eszközön
+        ugyanezt a kódot beírva ugyanazt az adatot látod. Tartsd titokban — bárki aki ismeri, hozzáfér a fitneszadataidhoz.
+      </p>
+      <div className="flex flex-wrap gap-2 items-center">
+        <input
+          className="input flex-1 min-w-[180px] font-mono"
+          placeholder="pl. abc123def456"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        {!code && (
+          <button className="btn-secondary text-sm" onClick={generate} disabled={busy}>
+            🎲 Generálj
+          </button>
+        )}
+        {!code && (
+          <button className="btn-primary text-sm" onClick={activate} disabled={busy}>
+            {busy ? "Folyamatban…" : "Aktiválás"}
+          </button>
+        )}
+        {code && (
+          <>
+            <button
+              className="btn-secondary text-sm"
+              onClick={async () => {
+                setBusy(true);
+                const p = await pushState(code, state);
+                setMsg(p.ok ? "✅ Feltöltve." : "Hiba: " + (p.error || ""));
+                setBusy(false);
+              }}
+              disabled={busy}
+            >
+              ↑ Feltöltés
+            </button>
+            <button
+              className="btn-secondary text-sm"
+              onClick={async () => {
+                setBusy(true);
+                const r = await pullState(code);
+                if (r.ok && r.data) {
+                  if (confirm("Felülírja a lokális adatokat a felhőbeli verzióval?")) {
+                    update(() => (r.data as any).state);
+                    setMsg("✅ Letöltve.");
+                  }
+                } else {
+                  setMsg("Hiba vagy üres: " + (r.error || "nincs adat"));
+                }
+                setBusy(false);
+              }}
+              disabled={busy}
+            >
+              ↓ Letöltés
+            </button>
+            <button className="btn-danger text-sm" onClick={disconnect}>
+              Lecsatlakozás
+            </button>
+          </>
+        )}
+      </div>
+      {code && (
+        <div className="text-xs text-muted">
+          Aktív kód: <code className="bg-panel2 px-1 rounded text-accent2">{code}</code> ·
+          minden változás után 3 mp-re automatikusan szinkronizál.
+        </div>
+      )}
+      {msg && <div className="text-sm text-accent2">{msg}</div>}
+      <details className="text-xs text-muted">
+        <summary className="cursor-pointer">Mit kell tennem hogy működjön a felhő?</summary>
+        <div className="mt-2 space-y-1">
+          <p>1. A Vercel projektedhez kapcsolj egy KV (Redis) adatbázist: Dashboard → fitness projekt → Storage → Create → KV.</p>
+          <p>2. Connect to project. Az env változók automatikusan beállítódnak (KV_REST_API_URL, KV_REST_API_TOKEN).</p>
+          <p>3. Redeploy (vagy várj a következő pushra).</p>
+          <p>4. Generálj egy sync kódot fent, és aktiváld. Másik eszközön ugyanezt írd be.</p>
+        </div>
+      </details>
+    </section>
   );
 }
